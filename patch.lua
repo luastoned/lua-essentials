@@ -3,7 +3,7 @@
 	==================================================
 	File:		patch.lua
 	Author:		@luastoned
-	Version:	v1.0
+	Version:	v1.1
 	==================================================
 
 --]]
@@ -41,6 +41,37 @@ function get()
 end
 
 --------------------------------------------------
+-- Meta
+--------------------------------------------------
+
+-- http://www.lua.org/manual/5.1/manual.html#2.8
+
+local stringMeta = getmetatable("")
+
+stringMeta.__index = function(self, key)
+	if (string[key]) then
+		return string[key]
+	elseif (tonumber(key)) then
+		return string.sub(self, key, key)
+	else
+		error("bad key to string index (number expected, got " .. type(key) .. ")", 2)
+	end
+end
+
+stringMeta.__mul = function(self, num)
+	return string.rep(self, num)
+end
+
+stringMeta.__mod = function(self, arg)
+	if (type(arg) == "string") then
+		return string.format(self, arg)
+	else
+		return string.format(self, unpack(arg))
+	end
+end
+
+
+--------------------------------------------------
 -- Debug
 --------------------------------------------------
 
@@ -53,7 +84,7 @@ function debug.getparams(f)
 			if k ~= "(*temporary)" then
 				table.insert(params, k)
 			end
-			i = i+1
+			i = i + 1
 			k, v = debug.getlocal(co, 2, i)
 		end
 		coroutine.yield()
@@ -71,8 +102,8 @@ end
 file = file or {}
 file.rename = os.rename
 
-function file.read(str)
-	local fh = io.open(str, "r")
+function file.read(str, mode)
+	local fh = io.open(str, mode or "r")
 	if (fh == nil) then
 		return ""
 	end
@@ -82,8 +113,8 @@ function file.read(str)
 	return str
 end
 
-function file.write(str, src)
-	local fh = io.open(str, "w")
+function file.write(str, src, mode)
+	local fh = io.open(str, mode or "w")
 	if (fh == nil) then
 		return false
 	end
@@ -93,8 +124,8 @@ function file.write(str, src)
 	return true
 end
 
-function file.append(str, src)
-	local fh = io.open(str, "a+")
+function file.append(str, src, mode)
+	local fh = io.open(str, mode or "a+")
 	if (fh == nil) then
 		return false
 	end
@@ -280,6 +311,17 @@ function string.encBase64(str)
 		end
 		return string.sub(base64_table, c + 1, c + 1)
 	end) .. ({"", "==", "="})[#str % 3 + 1])
+end
+
+function string.getChar(str, pos)
+	return string.sub(str, pos, pos)
+end
+
+function string.setChar(str, pos, char)
+	local pre = string.sub(str, 0, pos - 1)
+	local post = string.sub(str, pos + 1)
+
+	return pre .. char .. post
 end
 
 function string.split(str, separator, bPattern)
