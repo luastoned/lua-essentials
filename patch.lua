@@ -3,7 +3,7 @@
 	==================================================
 	File:		patch.lua
 	Author:		@luastoned
-	Version:	v1.1
+	Version:	v1.2
 	==================================================
 
 --]]
@@ -354,6 +354,18 @@ function string.toTable(str, num)
 		table.insert(tbl, string.sub(str, i, i + num - 1))
 	end
 	return tbl
+end
+
+function string.fromHex(str, fmt)
+	return string.gsub(str, fmt or "..", function(num)
+		return string.char(tonumber(num, 16))
+	end)
+end
+
+function string.toHex(str, fmt)
+	return string.gsub(".", function(char)
+		return string.format(fmt or "%02X", string.byte(char))
+	end)
 end
 
 --------------------------------------------------
