@@ -1,12 +1,9 @@
---[[
-
-	==================================================
-	File:		patch.lua
-	Author:		@luastoned
-	Version:	v1.2
-	==================================================
-
---]]
+local patch = {
+	_VERSION		= "patch.lua v1.2.0",
+	_DESCRIPTION	= "Library that adds various helper functions.",
+	_URL			= "https://github.com/luastoned/lua-patch",
+	_LICENSE		= [[Copyright (c) 2014 @luastoned]]
+}
 
 --------------------------------------------------
 -- Global
@@ -75,8 +72,8 @@ end
 -- Debug
 --------------------------------------------------
 
-function debug.getparams(f)
-	local co = coroutine.create(f)
+function debug.getparams(func)
+	local co = coroutine.create(func)
 	local params = {}
 	debug.sethook(co, function(event, line)
 		local i, k, v = 1, debug.getlocal(co, 2, 1)
@@ -276,12 +273,12 @@ end
 --------------------------------------------------
 
 -- character table string
-local base64_table = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/"
-function string.decBase64(str)
-    str = string.gsub(str, "[^" .. base64_table .. "=]", "")
+local base64table = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/"
+function string.decodeBase64(str)
+    str = string.gsub(str, "[^" .. base64table .. "=]", "")
     return (string.gsub(str, ".", function(x)
         if (x == "=") then return "" end
-        local r, f = "", (string.find(base64_table, x) - 1)
+        local r, f = "", (string.find(base64table, x) - 1)
         for i = 6, 1, -1 do
 			r = r .. (f % 2 ^ i - f % 2 ^ (i - 1) > 0 and "1" or "0")
 		end
@@ -296,7 +293,7 @@ function string.decBase64(str)
     end))
 end
 
-function string.encBase64(str)
+function string.encodeBase64(str)
 	return ((string.gsub(str, ".", function(x)
 		local r, b = "", string.byte(x)
 		for i = 8, 1, -1 do
@@ -309,7 +306,7 @@ function string.encBase64(str)
 		for i = 1, 6 do
 			c = c + (string.sub(x, i, i) == "1" and 2 ^ (6 - i) or 0)
 		end
-		return string.sub(base64_table, c + 1, c + 1)
+		return string.sub(base64table, c + 1, c + 1)
 	end) .. ({"", "==", "="})[#str % 3 + 1])
 end
 
@@ -320,22 +317,21 @@ end
 function string.setChar(str, pos, char)
 	local pre = string.sub(str, 0, pos - 1)
 	local post = string.sub(str, pos + 1)
-
 	return pre .. char .. post
 end
 
-function string.split(str, separator, bPattern)
+function string.split(str, separator, isPattern)
 	if (not separator or separator == "") then return string.toTable(str) end
 
-	local ret = {}
+	local tbl = {}
 	local index, lastPosition = 1, 1
 
 	-- Escape all magic characters in separator
-	if not bPattern then separator = string.gsub(separator, "[%-%^%$%(%)%%%.%[%]%*%+%-%?]", "%%%1") end
+	if not isPattern then separator = string.gsub(separator, "[%-%^%$%(%)%%%.%[%]%*%+%-%?]", "%%%1") end
 
 	-- Find the parts
 	for startPosition, endPosition in string.gmatch(str, "()" .. separator .. "()") do
-		ret[index] = string.sub(str, lastPosition, startPosition - 1)
+		tbl[index] = string.sub(str, lastPosition, startPosition - 1)
 		index = index + 1
 
 		-- Keep track of the position
@@ -343,8 +339,8 @@ function string.split(str, separator, bPattern)
 	end
 
 	-- Add last part by using the position we stored
-	ret[index] = string.sub(str, lastPosition)
-	return ret
+	tbl[index] = string.sub(str, lastPosition)
+	return tbl
 end
 
 function string.toTable(str, num)
@@ -372,25 +368,25 @@ end
 -- Table
 --------------------------------------------------
 
-function table.copy(tbl, lookup_tbl)
-	local copy = {}
-	setmetatable(copy, getmetatable(tbl))
+function table.copy(tbl, lookupTbl)
+	local tblCopy = {}
+	setmetatable(tblCopy, getmetatable(tbl))
 	
 	for k, v in pairs(tbl) do
 		if (type(v) ~= "table") then
-			copy[k] = v
+			tblCopy[k] = v
 		else
-			lookup_tbl = lookup_tbl or {}
-			lookup_tbl[tbl] = copy
-			if lookup_tbl[v] then
-				copy[k] = lookup_tbl[v]
+			lookupTbl = lookupTbl or {}
+			lookupTbl[tbl] = tblCopy
+			if lookupTbl[v] then
+				tblCopy[k] = lookupTbl[v]
 			else
-				copy[k] = table.copy(v, lookup_tbl)
+				tblCopy[k] = table.tblCopy(v, lookupTbl)
 			end
 		end
 	end
 	
-	return copy
+	return tblCopy
 end
 
 function table.count(tbl)
@@ -462,18 +458,17 @@ function table.toString(tbl, n, nice)
 		local str = ""
 		local done = done or {}
 		local indent = indent or 0
+		local isSequential = table.isSequential(tbl)
 		
 		local idt = ""
-		if nice then
+		if (nice) then
 			idt = string.rep("\t", indent)
 		end
-
-		local sequential = table.isSequential(tbl)
 
 		for k, v in pairs(tbl) do
 			str = str .. idt .. tab
 
-			if not sequential then
+			if (not isSequential) then
 				if type(k) == "number" or type(k) == "boolean" then
 					k = "[" .. tostring(k) .. "]" .. tab .. "="
 				else
@@ -483,13 +478,13 @@ function table.toString(tbl, n, nice)
 				k = ""
 			end
 
-			if type(v) == "table" and not done[v] then
+			if (type(v) == "table" and not done[v]) then
 				done [v] = true
 				str = str .. k .. tab .. "{" .. nl .. makeTable(v, nice, indent + 1, done)
 				str = str .. idt .. tab .. "}," .. nl
 
 			else
-				if type(v) == "string" then
+				if (type(v) == "string") then
 					v = '"' .. tostring(v) .. '"'
 				else
 					v = tostring(v)
@@ -513,3 +508,5 @@ end
 function table.print(tbl)
 	print(table.toString(tbl))
 end
+
+return patch
