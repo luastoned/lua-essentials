@@ -1,8 +1,8 @@
-local patch = {
-	_VERSION		= "patch.lua v1.2.0",
-	_DESCRIPTION	= "Library that adds various helper functions.",
-	_URL			= "https://github.com/luastoned/lua-patch",
-	_LICENSE		= [[Copyright (c) 2014 @luastoned]]
+local essentials = {
+    _VERSION        = "essentials.lua v1.0.0",
+    _DESCRIPTION    = "Library that adds various helper functions.",
+    _URL            = "https://github.com/luastoned/lua-essentials",
+    _LICENSE        = [[Copyright (c) 2014 @LuaStoned]]
 }
 
 --------------------------------------------------
@@ -509,4 +509,4 @@ function table.print(tbl)
 	print(table.toString(tbl))
 end
 
-return patch
+return essentials
