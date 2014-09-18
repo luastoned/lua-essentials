@@ -1,4 +1,4 @@
-lua-patch
-=========
+lua-essentials
+==============
 
 A module that extends Lua with a few essential functions
