@@ -1,6 +1,6 @@
 #
 # essentials.lua Makefile for installation.
-# Copyright (c) 2014 @LuaStoned
+# Copyright (c) 2015 @LuaStoned
 # See LICENSE file for license information.
 #
 
@@ -14,9 +14,10 @@ MINVER = 0
 MICVER = 0
 ESNVER = $(MAJVER).$(MINVER).$(MICVER)
 
-LUA_MODULEDIR = $(PREFIX)/share/lua/5.1
+LUA_VERSION ?= 5.1
+LUA_MODULEDIR = $(PREFIX)/share/lua/$(LUA_VERSION)
 
-LUAJIT_VERSION ?= 2.0.3
+LUAJIT_VERSION ?= 2.0.4
 LUAJIT_MODULEDIR = $(PREFIX)/share/luajit-$(LUAJIT_VERSION)
 
 default: install
