@@ -1,12 +1,80 @@
 local essentials = {
-    _VERSION        = "essentials.lua v1.0.0",
-    _DESCRIPTION    = "Library that adds various helper functions.",
+    _VERSION        = "essentials.lua v1.1.0",
+    _DESCRIPTION    = "Extends the standard Lua API with helpful functions.",
     _URL            = "https://github.com/luastoned/lua-essentials",
-    _LICENSE        = [[Copyright (c) 2014 @LuaStoned]]
+    _LICENSE        = [[Copyright (c) 2015 @LuaStoned]]
 }
 
+-- http://www.emoji-cheat-sheet.com/
+
 --------------------------------------------------
--- Global
+-- Local Helpers
+--------------------------------------------------
+
+local function patternEscape(str)
+	return string.gsub(str, "[%^%$%(%)%%%.%[%]%*%+%-%?]", "%%%0")
+	--return string.gsub(str, "[%-%.%+%[%]%(%)%$%^%%%?%*]", "%%%1")
+	--return string.gsub(str, "[%-%^%$%(%)%%%.%[%]%*%+%-%?]", "%%%1")
+end
+
+local patternReplacements = {
+	["("] = "%(",
+	[")"] = "%)",
+	["."] = "%.",
+	["%"] = "%%",
+	["+"] = "%+",
+	["-"] = "%-",
+	["*"] = "%*",
+	["?"] = "%?",
+	["["] = "%[",
+	["]"] = "%]",
+	["^"] = "%^",
+	["$"] = "%$",
+	["\0"] = "%z",
+}
+
+local function patternSafe(str)
+	return string.gsub(str, ".", patternReplacements)
+end
+
+local function expandTab(str, num)
+	return string.gsub(str, "([^\t]*)\t", function(s)
+		return s .. string.rep(" ", num - #s % num)
+	end)
+end
+
+local function expandTabs(str, num)
+	num = num or 8
+	if not string.find(str, "\n") then
+		return expandTab(str, num)
+	end
+	
+	local res = {}
+	for k, line in pairs(string.split(str, "\n")) do
+		res[k] = expandTab(line, num)
+	end
+	return table.concat(res, "\n")
+end
+
+local function getMetaMethod(func, method)
+	local ok, m = pcall(function(x)
+		return getmetatable(x)[method]
+	end, func)
+	if (type(m) ~= "function") then
+		m = nil
+	end
+	return m
+end
+
+local function isCallable(func)
+	if (type(func) == "function") then
+		return func
+	end
+	return getMetaMethod(func, "__call")
+end
+
+--------------------------------------------------
+-- Global Defines and Functions
 --------------------------------------------------
 
 include = dofile
@@ -16,11 +84,17 @@ function printf(fmt, ...)
 end
 
 function runString(str)
-	local ok, err = pcall(loadstring(str))
+	local runStr = rawget(_G, "loadstring") or load
+	local ok, err = pcall(runStr(str))
 	if (not ok) then
 		print(err)
 	end
 	return ok
+end
+
+function eval(str)
+	local runStr = rawget(_G, "loadstring") or load
+	return runStr("return " .. str)()
 end
 
 function profile(func, ...)
@@ -37,8 +111,14 @@ function get()
 	return io.stdin:read()
 end
 
+function lerp(delta, from, to)
+	if (delta > 1) then return to end
+	if (delta < 0) then return from end
+	return from + (to - from) * delta
+end
+
 --------------------------------------------------
--- Meta
+-- Meta Additions aka Magic
 --------------------------------------------------
 
 -- http://www.lua.org/manual/5.1/manual.html#2.8
@@ -51,7 +131,7 @@ stringMeta.__index = function(self, key)
 	elseif (tonumber(key)) then
 		return string.sub(self, key, key)
 	else
-		error("bad key to string index (number expected, got " .. type(key) .. ")", 2)
+		error("attempt to index a string value with bad key ('" .. tostring(key) .. "' is not part of the string library)", 2)
 	end
 end
 
@@ -67,10 +147,11 @@ stringMeta.__mod = function(self, arg)
 	end
 end
 
-
 --------------------------------------------------
 -- Debug
 --------------------------------------------------
+
+-- http://www.facepunch.com/showthread.php?884409-debug.getparams-Get-the-names-of-a-function-s-arguments
 
 function debug.getparams(func)
 	local co = coroutine.create(func)
@@ -91,13 +172,47 @@ function debug.getparams(func)
 	return params
 end
 
+function debug.getparamnames(func)
+    local func_paramInfoDict = debug.getinfo(func, 'u')
+    local func_paramCount = func_paramInfoDict.nparams
+    local func_isVarArg = func_paramInfoDict.isvararg
+    local paramNameList = {}
+    for i = 1, func_paramCount do
+        local param_name, param_value = debug.getlocal(func, i)
+        paramNameList[i] = param_name
+    end
+    return paramNameList, func_isVarArg
+end
+
+-- Argument Check
+local prevFunc, prevLine, curArg = "", 0, 0
+local function requireArg(arg, expected)
+	local info = debug.getinfo(2)
+	if (prevLine >= info.currentline or prevFunc ~= info.name) then
+		curArg = 0
+	end
+	
+	curArg = curArg  + 1
+	prevFunc = info.name
+	prevLine = info.currentline
+	assert(type(arg) == expected, string.format("bad argument #%d to '%s' (%s expected, got %s)", curArg, info.name, expected, type(arg)))
+end
+
 --------------------------------------------------
 -- File
 --------------------------------------------------
 
 -- If it doesn't already exist create a global file table
 file = file or {}
+file.delete = os.remove
 file.rename = os.rename
+
+file.fileSeperator = string.sub(package.config, 1, 1)
+file.fileSeperator = string.match(package.config, "^(%S+)\n")
+
+function file.catFile(...)
+	return table.concat({...}, file.fileSeperator)
+end
 
 function file.read(str, mode)
 	local fh = io.open(str, mode or "r")
@@ -213,6 +328,7 @@ function math.bin2hex(s)
 end
 
 function math.bin2dec(s)
+	-- return tonumber(bin,2)
 	-- s -> binary string
 	local num = 0
 	local ex = string.len(s) - 1
@@ -233,10 +349,21 @@ end
 function math.dec2bin(s, num)
 	-- s -> Base10 string
 	-- num -> string length to extend to
+	
+	--[[
+	local str = string.format("%o",int)
+
+	local a = {
+			["0"]="000",["1"]="001", ["2"]="010",["3"]="011",
+        		["4"]="100",["5"]="101", ["6"]="110",["7"]="111"
+		  }
+	local bin = string.gsub( str, "(.)", function ( d ) return a[ d ] end )
+	return bin
+	]]
 
 	local n = num or 0
 	s = string.format("%x", s)
-	s = Hex2Bin(s)
+	s = math.hex2bin(s)
 
 	while string.len(s) < n do
 		s = "0" .. s
@@ -260,12 +387,13 @@ end
 function math.clamp(num, low, high)
 	if (num < low) then return low end
 	if (num > high) then return high end
-	return num -- return math.min(high, math.max(num, low))
+	return num
+	--return math.min(high, math.max(num, low))
 end
 
 function math.round(num, idp)
-	local mult = 10^(idp or 0)
-	return math.floor(num * mult + 0.5) / mult
+	local e = 10^(idp or 0)
+	return math.floor(num * e + 0.5) / e
 end
 
 --------------------------------------------------
@@ -318,6 +446,23 @@ function string.setChar(str, pos, char)
 	local pre = string.sub(str, 0, pos - 1)
 	local post = string.sub(str, pos + 1)
 	return pre .. char .. post
+end
+
+function string.trim(str, char)
+	char = char and patternSafe(char) or "%s"
+	return string.match(str, "^" .. char .. "*(.-)" .. char .. "*$") or str
+end
+
+function string.left(str, num)
+	return string.sub(str, 1, num)
+end
+
+function string.right(str, num)
+	return string.sub(str, -num)
+end
+
+function string.replace(str, find, replace)
+	return string.gsub(str, patternSafe(find), string.gsub(replace, "%%", "%%%1"))
 end
 
 function string.split(str, separator, isPattern)
@@ -381,7 +526,7 @@ function table.copy(tbl, lookupTbl)
 			if lookupTbl[v] then
 				tblCopy[k] = lookupTbl[v]
 			else
-				tblCopy[k] = table.tblCopy(v, lookupTbl)
+				tblCopy[k] = table.copy(v, lookupTbl)
 			end
 		end
 	end
@@ -419,6 +564,50 @@ end
 function table.getLastValue(tbl)
 	local k, v = next(tbl, table.count(tbl) - 1)
 	return v
+end
+
+function table.findNext(tbl, val)
+	local bFound = false
+	for k, v in pairs(tbl) do
+		if (bFound) then return v end
+		if (val == v) then bFound = true end
+	end
+	return table.getFirstValue(tbl)
+end
+
+function table.findPrev(tbl, val)
+	local last = table.getLastValue(tbl)
+	for k, v in pairs(tbl) do
+		if (val == v) then return last end
+		last = v
+	end
+	return last
+end
+
+function table.hasKey(tbl, key)
+	for k, v in pairs(tbl) do
+		if (k == key) then
+			return true
+		end
+	end
+	return false
+end
+
+function table.hasValue(tbl, val)
+	for k, v in pairs(tbl) do
+		if (v == val) then
+			return true
+		end
+	end
+	return false
+end
+
+function table.invert(tbl)
+	local inv = {}
+	for k, v in pars(tbl) do
+		inv[v] = k
+	end
+	return tbl
 end
 
 function table.isSequential(tbl)
