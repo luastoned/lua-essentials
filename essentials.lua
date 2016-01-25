@@ -151,8 +151,26 @@ end
 -- Debug
 --------------------------------------------------
 
--- http://www.facepunch.com/showthread.php?884409-debug.getparams-Get-the-names-of-a-function-s-arguments
+-- http://leafo.net/guides/dynamic-scoping-in-lua.html
+function debug.dynamic(name)
+	local level = 2
+	-- iterate over 
+	while true do
+		local i = 1
+		-- iterate over each local by index
+		while true do
+			local found_name, found_val = debug.getlocal(level, i)
+			if not found_name then break end
+			if found_name == name then
+				return found_val
+			end
+			i = i + 1
+		end
+		level = level + 1
+	end
+end
 
+-- http://www.facepunch.com/showthread.php?884409-debug.getparams-Get-the-names-of-a-function-s-arguments
 function debug.getparams(func)
 	local co = coroutine.create(func)
 	local params = {}
