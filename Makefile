@@ -1,6 +1,6 @@
 #
 # Makefile for installation.
-# Copyright (c) 2015 @LuaStoned
+# Copyright (c) 2017 @LuaStoned
 # See LICENSE file for license information.
 #
 
