@@ -2,7 +2,7 @@ local essentials = {
     _VERSION        = "essentials.lua v1.1.0",
     _DESCRIPTION    = "Extends the standard Lua API with helpful functions.",
     _URL            = "https://github.com/luastoned/lua-essentials",
-    _LICENSE        = [[Copyright (c) 2015 @LuaStoned]]
+    _LICENSE        = [[Copyright (c) 2017 @LuaStoned]]
 }
 
 -- http://www.emoji-cheat-sheet.com/
